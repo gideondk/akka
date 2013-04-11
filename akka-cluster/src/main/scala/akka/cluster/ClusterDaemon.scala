@@ -299,10 +299,8 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
   }
 
   def tryingToJoin(joinWith: Address, deadline: Option[Deadline]): Actor.Receive = {
-    case Welcome(from, gossip) if from == joinWith ⇒ welcome(from, gossip)
-    case Welcome(from, _) ⇒
-      log.info("Ignoring welcome from [{}] when trying to join with [{}]", from, joinWith)
-    case InitJoin ⇒ sender ! InitJoinNack(selfAddress)
+    case Welcome(from, gossip) ⇒ welcome(joinWith, from, gossip)
+    case InitJoin              ⇒ sender ! InitJoinNack(selfAddress)
     case ClusterUserAction.JoinTo(address) ⇒
       context.become(uninitialized)
       join(address)
@@ -404,14 +402,18 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
   /**
    * Reply from Join request.
    */
-  def welcome(from: UniqueAddress, gossip: Gossip): Unit = {
+  def welcome(joinWith: Address, from: UniqueAddress, gossip: Gossip): Unit = {
     require(latestGossip.members.isEmpty, "Join can only be done from empty state")
-    log.info("Cluster Node [{}] - Welcome from [{}]", selfAddress, from)
-    latestGossip = gossip seen selfUniqueAddress
-    publish(latestGossip)
-    if (from != selfUniqueAddress)
-      oneWayGossipTo(from)
-    context.become(initialized)
+    if (joinWith != from.address)
+      log.info("Ignoring welcome from [{}] when trying to join with [{}]", from.address, joinWith)
+    else {
+      log.info("Cluster Node [{}] - Welcome from [{}]", selfAddress, from.address)
+      latestGossip = gossip seen selfUniqueAddress
+      publish(latestGossip)
+      if (from != selfUniqueAddress)
+        oneWayGossipTo(from)
+      context.become(initialized)
+    }
   }
 
   /**
@@ -430,8 +432,8 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
 
       // check by address without uid to make sure that node with same host:port is not allowed
       // to join until previous node with that host:port has been removed from the cluster
-      val alreadyMember = localMembers.exists(_.addressFIXME == node.address)
-      val isUnreachable = localUnreachable.exists(_.addressFIXME == node.address)
+      val alreadyMember = localMembers.exists(_.address == node.address)
+      val isUnreachable = localUnreachable.exists(_.address == node.address)
 
       if (alreadyMember)
         log.info("Existing member [{}] is trying to join, ignoring", node)
@@ -467,8 +469,8 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
    */
   def leaving(address: Address): Unit = {
     // only try to update if the node is available (in the member ring)
-    if (latestGossip.members.exists(m ⇒ m.addressFIXME == address && m.status == Up)) {
-      val newMembers = latestGossip.members map { m ⇒ if (m.addressFIXME == address) m.copy(status = Leaving) else m } // mark node as LEAVING
+    if (latestGossip.members.exists(m ⇒ m.address == address && m.status == Up)) {
+      val newMembers = latestGossip.members map { m ⇒ if (m.address == address) m.copy(status = Leaving) else m } // mark node as LEAVING
       val newGossip = latestGossip copy (members = newMembers)
 
       val versionedGossip = newGossip :+ vclockNode
@@ -518,11 +520,11 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
 
     // 1. check if the node to DOWN is in the 'members' set
     val downedMember: Option[Member] =
-      localMembers.collectFirst { case m if m.addressFIXME == address ⇒ m.copy(status = Down) }
+      localMembers.collectFirst { case m if m.address == address ⇒ m.copy(status = Down) }
 
     val newMembers = downedMember match {
       case Some(m) ⇒
-        log.info("Cluster Node [{}] - Marking node [{}] as [{}]", selfAddress, m.addressFIXME, Down)
+        log.info("Cluster Node [{}] - Marking node [{}] as [{}]", selfAddress, m.address, Down)
         localMembers - m
       case None ⇒ localMembers
     }
@@ -531,8 +533,8 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     val newUnreachableMembers =
       localUnreachableMembers.map { member ⇒
         // no need to DOWN members already DOWN
-        if (member.addressFIXME == address && member.status != Down) {
-          log.info("Cluster Node [{}] - Marking unreachable node [{}] as [{}]", selfAddress, member.addressFIXME, Down)
+        if (member.address == address && member.status != Down) {
+          log.info("Cluster Node [{}] - Marking unreachable node [{}] as [{}]", selfAddress, member.address, Down)
           member copy (status = Down)
         } else member
       }
@@ -560,7 +562,7 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     val remoteGossip = envelope.gossip
     val localGossip = latestGossip
 
-    if (remoteGossip.overview.unreachable.exists(_.addressFIXME == selfAddress))
+    if (remoteGossip.overview.unreachable.exists(_.address == selfAddress))
       log.info("Ignoring received gossip with myself as unreachable, from [{}]", selfAddress, from.address)
     else if (localGossip.overview.unreachable.exists(_.uniqueAddress == from))
       log.info("Ignoring received gossip from unreachable [{}] ", from)
@@ -593,7 +595,7 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
 
       // for all new joining nodes we remove them from the failure detector
       latestGossip.members foreach {
-        node ⇒ if (node.status == Joining && !localGossip.members(node)) failureDetector.remove(node.addressFIXME)
+        node ⇒ if (node.status == Joining && !localGossip.members(node)) failureDetector.remove(node.address)
       }
 
       log.debug("Cluster Node [{}] - Receiving gossip from [{}]", selfAddress, from)
@@ -788,12 +790,12 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
         // log the move of members from joining to up
         upMembers foreach { member ⇒
           log.info("Cluster Node [{}] - Leader is moving node [{}] from [{}] to [{}]",
-            selfAddress, member.addressFIXME, member.status, Up)
+            selfAddress, member.address, member.status, Up)
         }
 
         //  tell all removed members to remove and shut down themselves
         removedMembers foreach { member ⇒
-          val address = member.addressFIXME
+          val address = member.address
           log.info("Cluster Node [{}] - Leader is moving node [{}] from [{}] to [{}] - and removing node from node ring",
             selfAddress, address, member.status, Removed)
           clusterCore(address) ! ClusterLeaderAction.Shutdown(member.uniqueAddress)
@@ -801,7 +803,7 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
 
         //  tell all exiting members to exit
         exitingMembers foreach { member ⇒
-          val address = member.addressFIXME
+          val address = member.address
           log.info("Cluster Node [{}] - Leader is moving node [{}] from [{}] to [{}]",
             selfAddress, address, member.status, Exiting)
           clusterCore(address) ! ClusterLeaderAction.Exit(member.uniqueAddress) // FIXME should wait for completion of handoff?
@@ -809,12 +811,12 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
 
         // log the auto-downing of the unreachable nodes
         unreachableButNotDownedMembers foreach { member ⇒
-          log.info("Cluster Node [{}] - Leader is marking unreachable node [{}] as [{}]", selfAddress, member.addressFIXME, Down)
+          log.info("Cluster Node [{}] - Leader is marking unreachable node [{}] as [{}]", selfAddress, member.address, Down)
         }
 
         // log the auto-downing of the unreachable nodes
         removedUnreachableMembers foreach { member ⇒
-          log.info("Cluster Node [{}] - Leader is removing unreachable node [{}]", selfAddress, member.addressFIXME)
+          log.info("Cluster Node [{}] - Leader is removing unreachable node [{}]", selfAddress, member.address)
         }
 
         publish(latestGossip)
@@ -835,7 +837,7 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
       val localUnreachableMembers = localGossip.overview.unreachable
 
       val newlyDetectedUnreachableMembers = localMembers filterNot { member ⇒
-        member.uniqueAddress == selfUniqueAddress || failureDetector.isAvailable(member.addressFIXME)
+        member.uniqueAddress == selfUniqueAddress || failureDetector.isAvailable(member.address)
       }
 
       if (newlyDetectedUnreachableMembers.nonEmpty) {
@@ -882,7 +884,7 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
   // needed for tests
   def sendGossipTo(address: Address): Unit = {
     latestGossip.members.foreach(m ⇒
-      if (m.addressFIXME == address)
+      if (m.address == address)
         gossipTo(m.uniqueAddress))
   }
 

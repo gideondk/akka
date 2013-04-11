@@ -87,10 +87,10 @@ class ClusterDomainEventSpec extends WordSpec with MustMatchers {
 
       diffMemberEvents(g1, g2) must be(Seq.empty)
       diffUnreachable(g1, g2) must be(Seq.empty)
-      diffSeen(g1, g2) must be(Seq(SeenChanged(convergence = true, seenBy = Set(aUp.addressFIXME, bUp.addressFIXME))))
+      diffSeen(g1, g2) must be(Seq(SeenChanged(convergence = true, seenBy = Set(aUp.address, bUp.address))))
       diffMemberEvents(g2, g1) must be(Seq.empty)
       diffUnreachable(g2, g1) must be(Seq.empty)
-      diffSeen(g2, g1) must be(Seq(SeenChanged(convergence = true, seenBy = Set(aUp.addressFIXME, bUp.addressFIXME, eJoining.addressFIXME))))
+      diffSeen(g2, g1) must be(Seq(SeenChanged(convergence = true, seenBy = Set(aUp.address, bUp.address, eJoining.address))))
     }
 
     "be produced for leader changes" in {
@@ -100,7 +100,7 @@ class ClusterDomainEventSpec extends WordSpec with MustMatchers {
       diffMemberEvents(g1, g2) must be(Seq(MemberRemoved(aRemoved)))
       diffUnreachable(g1, g2) must be(Seq.empty)
       diffSeen(g1, g2) must be(Seq(SeenChanged(convergence = true, seenBy = s2.map(_.address))))
-      diffLeader(g1, g2) must be(Seq(LeaderChanged(Some(bUp.addressFIXME))))
+      diffLeader(g1, g2) must be(Seq(LeaderChanged(Some(bUp.address))))
     }
 
     "be produced for role leader changes" in {
@@ -108,16 +108,16 @@ class ClusterDomainEventSpec extends WordSpec with MustMatchers {
       val g1 = Gossip(members = SortedSet(aUp, bUp, cUp, dLeaving, eJoining))
       val g2 = Gossip(members = SortedSet(bUp, cUp, dExiting, eJoining))
       diffRolesLeader(g0, g1) must be(
-        Set(RoleLeaderChanged("AA", Some(aUp.addressFIXME)),
-          RoleLeaderChanged("AB", Some(aUp.addressFIXME)),
-          RoleLeaderChanged("BB", Some(bUp.addressFIXME)),
-          RoleLeaderChanged("DD", Some(dLeaving.addressFIXME)),
-          RoleLeaderChanged("DE", Some(dLeaving.addressFIXME)),
-          RoleLeaderChanged("EE", Some(eUp.addressFIXME))))
+        Set(RoleLeaderChanged("AA", Some(aUp.address)),
+          RoleLeaderChanged("AB", Some(aUp.address)),
+          RoleLeaderChanged("BB", Some(bUp.address)),
+          RoleLeaderChanged("DD", Some(dLeaving.address)),
+          RoleLeaderChanged("DE", Some(dLeaving.address)),
+          RoleLeaderChanged("EE", Some(eUp.address))))
       diffRolesLeader(g1, g2) must be(
         Set(RoleLeaderChanged("AA", None),
-          RoleLeaderChanged("AB", Some(bUp.addressFIXME)),
-          RoleLeaderChanged("DE", Some(eJoining.addressFIXME))))
+          RoleLeaderChanged("AB", Some(bUp.address)),
+          RoleLeaderChanged("DE", Some(eJoining.address))))
     }
   }
 }

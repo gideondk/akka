@@ -56,7 +56,7 @@ class ClusterDomainEventPublisherSpec extends AkkaSpec
     publisher = system.actorOf(Props[ClusterDomainEventPublisher])
     publisher ! PublishChanges(g0)
     memberSubscriber.expectMsg(MemberUp(aUp))
-    memberSubscriber.expectMsg(LeaderChanged(Some(aUp.addressFIXME)))
+    memberSubscriber.expectMsg(LeaderChanged(Some(aUp.address)))
   }
 
   "ClusterDomainEventPublisher" must {
@@ -73,7 +73,7 @@ class ClusterDomainEventPublisherSpec extends AkkaSpec
       memberSubscriber.expectMsg(MemberUp(a51Up))
       memberSubscriber.expectMsg(MemberExited(bExiting))
       memberSubscriber.expectMsg(MemberUp(cUp))
-      memberSubscriber.expectMsg(LeaderChanged(Some(a51Up.addressFIXME)))
+      memberSubscriber.expectMsg(LeaderChanged(Some(a51Up.address)))
       memberSubscriber.expectNoMsg(1 second)
     }
 
@@ -85,7 +85,7 @@ class ClusterDomainEventPublisherSpec extends AkkaSpec
       memberSubscriber.expectNoMsg(1 second)
       publisher ! PublishChanges(g7)
       memberSubscriber.expectMsg(MemberExited(aExiting))
-      memberSubscriber.expectMsg(LeaderChanged(Some(cUp.addressFIXME)))
+      memberSubscriber.expectMsg(LeaderChanged(Some(cUp.address)))
       memberSubscriber.expectNoMsg(1 second)
       // at the removed member a an empty gossip is the last thing
       publisher ! PublishChanges(Gossip.empty)
@@ -100,7 +100,7 @@ class ClusterDomainEventPublisherSpec extends AkkaSpec
       memberSubscriber.expectMsg(MemberUp(a51Up))
       memberSubscriber.expectMsg(MemberExited(bExiting))
       memberSubscriber.expectMsg(MemberUp(cUp))
-      memberSubscriber.expectMsg(LeaderChanged(Some(a51Up.addressFIXME)))
+      memberSubscriber.expectMsg(LeaderChanged(Some(a51Up.address)))
 
       publisher ! PublishChanges(g5)
       memberSubscriber.expectNoMsg(1 second)
@@ -111,9 +111,9 @@ class ClusterDomainEventPublisherSpec extends AkkaSpec
       publisher ! Subscribe(subscriber.ref, classOf[RoleLeaderChanged])
       subscriber.expectMsgType[CurrentClusterState]
       publisher ! PublishChanges(Gossip(members = SortedSet(cJoining, dUp)))
-      subscriber.expectMsg(RoleLeaderChanged("GRP", Some(dUp.addressFIXME)))
+      subscriber.expectMsg(RoleLeaderChanged("GRP", Some(dUp.address)))
       publisher ! PublishChanges(Gossip(members = SortedSet(cUp, dUp)))
-      subscriber.expectMsg(RoleLeaderChanged("GRP", Some(cUp.addressFIXME)))
+      subscriber.expectMsg(RoleLeaderChanged("GRP", Some(cUp.address)))
     }
 
     "send CurrentClusterState when subscribe" in {

@@ -249,14 +249,14 @@ private[akka] class ClusterRouteeProvider(
   private[routing] var nodes: immutable.SortedSet[Address] = {
     import Member.addressOrdering
     cluster.readView.members.collect {
-      case m if isAvailable(m) ⇒ m.addressFIXME
+      case m if isAvailable(m) ⇒ m.address
     }
   }
 
   private[routing] def isAvailable(m: Member): Boolean =
     m.status == MemberStatus.Up &&
       satisfiesRole(m.roles) &&
-      (settings.allowLocalRoutees || m.addressFIXME != cluster.selfAddress)
+      (settings.allowLocalRoutees || m.address != cluster.selfAddress)
 
   private def satisfiesRole(memberRoles: Set[String]): Boolean = settings.useRole match {
     case None    ⇒ true
@@ -290,7 +290,7 @@ private[akka] class ClusterRouterActor extends Router {
   def fullAddress(actorRef: ActorRef): Address = routeeProvider.fullAddress(actorRef)
 
   def unregisterRoutees(member: Member) = {
-    val address = member.addressFIXME
+    val address = member.address
     routeeProvider.nodes -= address
 
     // unregister routees that live on that node
@@ -305,11 +305,11 @@ private[akka] class ClusterRouterActor extends Router {
   override def routerReceive: Receive = {
     case s: CurrentClusterState ⇒
       import Member.addressOrdering
-      routeeProvider.nodes = s.members.collect { case m if routeeProvider.isAvailable(m) ⇒ m.addressFIXME }
+      routeeProvider.nodes = s.members.collect { case m if routeeProvider.isAvailable(m) ⇒ m.address }
       routeeProvider.createRoutees()
 
     case m: MemberEvent if routeeProvider.isAvailable(m.member) ⇒
-      routeeProvider.nodes += m.member.addressFIXME
+      routeeProvider.nodes += m.member.address
       // createRoutees will create routees based on
       // totalInstances and maxInstancesPerNode
       routeeProvider.createRoutees()

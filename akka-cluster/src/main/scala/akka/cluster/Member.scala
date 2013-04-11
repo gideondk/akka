@@ -24,14 +24,14 @@ class Member private[cluster] (
   val status: MemberStatus,
   val roles: Set[String]) extends Serializable {
 
-  def addressFIXME: Address = uniqueAddress.address
+  def address: Address = uniqueAddress.address
 
   override def hashCode = uniqueAddress.##
   override def equals(other: Any) = other match {
     case m: Member ⇒ uniqueAddress == m.uniqueAddress
     case _         ⇒ false
   }
-  override def toString = "Member(address = %s, status = %s)" format (addressFIXME, status)
+  override def toString = "Member(address = %s, status = %s)" format (address, status)
 
   def hasRole(role: String): Boolean = roles.contains(role)
 
@@ -104,7 +104,7 @@ object Member {
    */
   implicit val ordering: Ordering[Member] = new Ordering[Member] {
     def compare(a: Member, b: Member): Int = {
-      val result = addressOrdering.compare(a.addressFIXME, b.addressFIXME)
+      val result = addressOrdering.compare(a.address, b.address)
       if (result == 0) {
         val aUid = a.uniqueAddress.uid
         val bUid = b.uniqueAddress.uid

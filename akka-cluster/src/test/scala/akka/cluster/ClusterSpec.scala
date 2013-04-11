@@ -64,8 +64,8 @@ class ClusterSpec extends AkkaSpec(ClusterSpec.config) with ImplicitSender {
       cluster.join(selfAddress)
       leaderActions() // Joining -> Up
       awaitCond(clusterView.isSingletonCluster)
-      clusterView.self.addressFIXME must be(selfAddress)
-      clusterView.members.map(_.addressFIXME) must be(Set(selfAddress))
+      clusterView.self.address must be(selfAddress)
+      clusterView.members.map(_.address) must be(Set(selfAddress))
       awaitAssert(clusterView.status must be(MemberStatus.Up))
     }
 
@@ -94,7 +94,7 @@ class ClusterSpec extends AkkaSpec(ClusterSpec.config) with ImplicitSender {
       expectMsgClass(classOf[ClusterEvent.CurrentClusterState])
 
       cluster.shutdown()
-      expectMsgType[ClusterEvent.MemberRemoved].member.addressFIXME must be(selfAddress)
+      expectMsgType[ClusterEvent.MemberRemoved].member.address must be(selfAddress)
     }
 
   }

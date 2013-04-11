@@ -315,7 +315,7 @@ private[cluster] final class ClusterDomainEventPublisher extends Actor with Acto
         case MemberRemoved(m) ⇒
           publish(event)
           // notify DeathWatch about downed node
-          publish(AddressTerminated(m.addressFIXME))
+          publish(AddressTerminated(m.address))
         case _ ⇒ publish(event)
       }
     }
