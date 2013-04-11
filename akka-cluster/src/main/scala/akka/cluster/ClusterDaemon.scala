@@ -60,6 +60,11 @@ private[cluster] object InternalClusterAction {
   case class JoinTo(address: Address)
 
   /**
+   * Reply to Join
+   */
+  case class Welcome(from: Address, gossip: Gossip) extends ClusterMessage
+
+  /**
    * Command to initiate the process to join the specified
    * seed nodes.
    */
@@ -240,8 +245,6 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
 
   var seedNodeProcess: Option[ActorRef] = None
 
-  var tryingToJoinWith: Option[Address] = None
-
   /**
    * Looks up and returns the remote cluster command connection for the specific address.
    */
@@ -283,6 +286,17 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
   }
 
   def uninitialized: Actor.Receive = {
+    case InitJoin                 ⇒ sender ! InitJoinNack(selfAddress)
+    case JoinTo(address)          ⇒ join(address)
+    case JoinSeedNodes(seedNodes) ⇒ joinSeedNodes(seedNodes)
+    case msg: SubscriptionMessage ⇒ publisher forward msg
+    case _: Tick                  ⇒ // ignore periodic tasks until initialized
+  }
+
+  def tryingToJoin(joinWith: Address): Actor.Receive = {
+    case Welcome(from, gossip) if from == joinWith ⇒ welcome(from, gossip)
+    case Welcome(from, _) ⇒
+      log.info("Ignoring welcome from [{}] when trying to join with [{}]", from, joinWith)
     case InitJoin                 ⇒ sender ! InitJoinNack(selfAddress)
     case JoinTo(address)          ⇒ join(address)
     case JoinSeedNodes(seedNodes) ⇒ joinSeedNodes(seedNodes)
@@ -359,16 +373,27 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
         case None ⇒ // no seedNodeProcess in progress
       }
 
-      context.become(initialized)
-
       if (address == selfAddress) {
-        tryingToJoinWith = None
+        context.become(initialized)
         joining(address, cluster.selfRoles)
       } else {
-        tryingToJoinWith = Some(address)
+        context.become(tryingToJoin(address))
         clusterCore(address) ! ClusterUserAction.Join(selfAddress, cluster.selfRoles)
       }
     }
+  }
+
+  /**
+   * Reply from Join request.
+   */
+  def welcome(from: Address, gossip: Gossip): Unit = {
+    require(latestGossip.members.isEmpty, "Join can only be done from empty state")
+    log.info("Cluster Node [{}] - Welcome from [{}]", selfAddress, from)
+    latestGossip = gossip seen selfAddress
+    publish(latestGossip)
+    if (from != selfAddress)
+      oneWayGossipTo(from)
+    context.become(initialized)
   }
 
   /**
@@ -409,7 +434,7 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
 
         log.info("Cluster Node [{}] - Node [{}] is JOINING, roles [{}]", selfAddress, node, roles.mkString(", "))
         if (node != selfAddress) {
-          gossipTo(node)
+          clusterCore(node) ! Welcome(selfAddress, latestGossip)
         }
 
         publish(latestGossip)
@@ -520,14 +545,11 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
       log.info("Ignoring received gossip with self [{}] as unreachable, from [{}]", selfAddress, from)
     else if (localGossip.overview.unreachable.exists(_.address == from))
       log.info("Ignoring received gossip from unreachable [{}] ", from)
-    else if (tryingToJoinWith.isEmpty && localGossip.members.forall(_.address != from))
+    else if (localGossip.members.forall(_.address != from))
       log.info("Ignoring received gossip from unknown [{}]", from)
-    else if (tryingToJoinWith.nonEmpty && tryingToJoinWith.get != from)
-      log.info("Ignoring received gossip from [{}] when trying to join to [{}]", from, tryingToJoinWith.get)
     else {
       require(remoteGossip.members.exists(_.address == selfAddress),
         s"Received gossip does not contain myself [${selfAddress}])")
-      if (tryingToJoinWith.nonEmpty) tryingToJoinWith = None
 
       val comparison = remoteGossip.version tryCompareTo localGossip.version
       val conflict = comparison.isEmpty
