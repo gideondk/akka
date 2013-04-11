@@ -273,7 +273,6 @@ private[cluster] final class ClusterDomainEventPublisher extends Actor with Acto
     case Subscribe(subscriber, to)            ⇒ subscribe(subscriber, to)
     case Unsubscribe(subscriber, to)          ⇒ unsubscribe(subscriber, to)
     case PublishEvent(event)                  ⇒ publish(event)
-    case PublishStart                         ⇒ publishStart()
   }
 
   def eventStream: EventStream = context.system.eventStream

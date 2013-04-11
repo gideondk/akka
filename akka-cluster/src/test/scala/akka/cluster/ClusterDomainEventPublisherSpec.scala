@@ -136,20 +136,6 @@ class ClusterDomainEventPublisherSpec extends AkkaSpec
       memberSubscriber.expectMsg(MemberUp(cUp))
     }
 
-    "publish clean state when PublishStart" in {
-      val subscriber = TestProbe()
-      publisher ! Subscribe(subscriber.ref, classOf[ClusterDomainEvent])
-      subscriber.expectMsgType[CurrentClusterState]
-      publisher ! PublishChanges(g3)
-      subscriber.expectMsg(MemberExited(bExiting))
-      subscriber.expectMsg(MemberUp(cUp))
-      subscriber.expectMsg(RoleLeaderChanged("GRP", Some(cUp.address)))
-      subscriber.expectMsgType[SeenChanged]
-
-      publisher ! PublishStart
-      subscriber.expectMsgType[CurrentClusterState] must be(CurrentClusterState())
-    }
-
     "publish SeenChanged" in {
       val subscriber = TestProbe()
       publisher ! Subscribe(subscriber.ref, classOf[SeenChanged])

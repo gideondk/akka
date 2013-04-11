@@ -215,11 +215,7 @@ private[cluster] case class Gossip(
   }
 
   override def toString =
-    "Gossip(" +
-      "overview = " + overview +
-      ", members = [" + members.mkString(", ") +
-      "], version = " + version +
-      ")"
+    s"Gossip(members = [${members.mkString(", ")}], overview = ${overview}, version = ${version})"
 }
 
 /**
@@ -231,13 +227,8 @@ private[cluster] case class GossipOverview(
   seen: Map[Address, VectorClock] = Map.empty,
   unreachable: Set[Member] = Set.empty) {
 
-  def isNonDownUnreachable(address: Address): Boolean =
-    unreachable.exists { m ⇒ m.address == address && m.status != Down }
-
   override def toString =
-    "GossipOverview(seen = [" + seen.mkString(", ") +
-      "], unreachable = [" + unreachable.mkString(", ") +
-      "])"
+    s"GossipOverview(unreachable = [${unreachable.mkString(", ")}], seen = [${seen.mkString(", ")}])"
 }
 
 /**

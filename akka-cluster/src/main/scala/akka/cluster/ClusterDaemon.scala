@@ -134,7 +134,6 @@ private[cluster] object InternalClusterAction {
   sealed trait PublishMessage
   case class PublishChanges(newGossip: Gossip) extends PublishMessage
   case class PublishEvent(event: ClusterDomainEvent) extends PublishMessage
-  case object PublishStart extends PublishMessage
 }
 
 /**
@@ -344,7 +343,9 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     else if (address.system != selfAddress.system)
       log.warning("Trying to join member with wrong ActorSystem name, but was ignored, expected [{}] but was [{}]",
         selfAddress.system, address.system)
-    else if (!latestGossip.members.exists(_.address == address)) {
+    else if (latestGossip.members.nonEmpty || latestGossip.overview.unreachable.nonEmpty)
+      log.info("Trying to join [{}] when already part of a cluster, ignoring", address)
+    else {
       // to support manual join when joining to seed nodes is stuck (no seed nodes available)
       val snd = sender
       seedNodeProcess match {
@@ -358,23 +359,15 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
         case None ⇒ // no seedNodeProcess in progress
       }
 
-      // only wipe the state if we're not in the process of joining this address
-      if (tryingToJoinWith.forall(_ != address)) {
-        tryingToJoinWith = Some(address)
-        // wipe our state since a node that joins a cluster must be empty
-        latestGossip = Gossip.empty
-        // wipe the failure detector since we are starting fresh and shouldn't care about the past
-        failureDetector.reset()
-        // wipe the publisher since we are starting fresh
-        publisher ! PublishStart
-
-        publish(latestGossip)
-      }
       context.become(initialized)
-      if (address == selfAddress)
+
+      if (address == selfAddress) {
+        tryingToJoinWith = None
         joining(address, cluster.selfRoles)
-      else
+      } else {
+        tryingToJoinWith = Some(address)
         clusterCore(address) ! ClusterUserAction.Join(selfAddress, cluster.selfRoles)
+      }
     }
   }
 
@@ -395,7 +388,11 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
       val alreadyMember = localMembers.exists(_.address == node)
       val isUnreachable = localUnreachable.exists(_.address == node)
 
-      if (!alreadyMember && !isUnreachable) {
+      if (alreadyMember)
+        log.info("Existing member [{}] is trying to join, ignoring", node)
+      else if (isUnreachable)
+        log.info("Unreachable member [{}] is trying to join, ignoring", node)
+      else {
 
         // remove the node from the failure detector
         failureDetector.remove(node)
@@ -519,14 +516,18 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     val remoteGossip = envelope.gossip
     val localGossip = latestGossip
 
-    if (remoteGossip.overview.unreachable.exists(_.address == selfAddress)) {
-      log.debug("Ignoring received gossip with self [{}] as unreachable, from [{}]", selfAddress, from)
-    } else if (localGossip.overview.isNonDownUnreachable(from)) {
-      log.debug("Ignoring received gossip from unreachable [{}] ", from)
-    } else {
-      // if we're in the remote gossip and not Removed, then we're not joining
-      if (tryingToJoinWith.nonEmpty && remoteGossip.member(selfAddress).status != Removed)
-        tryingToJoinWith = None
+    if (remoteGossip.overview.unreachable.exists(_.address == selfAddress))
+      log.info("Ignoring received gossip with self [{}] as unreachable, from [{}]", selfAddress, from)
+    else if (localGossip.overview.unreachable.exists(_.address == from))
+      log.info("Ignoring received gossip from unreachable [{}] ", from)
+    else if (tryingToJoinWith.isEmpty && localGossip.members.forall(_.address != from))
+      log.info("Ignoring received gossip from unknown [{}]", from)
+    else if (tryingToJoinWith.nonEmpty && tryingToJoinWith.get != from)
+      log.info("Ignoring received gossip from [{}] when trying to join to [{}]", from, tryingToJoinWith.get)
+    else {
+      require(remoteGossip.members.exists(_.address == selfAddress),
+        s"Received gossip does not contain myself [${selfAddress}])")
+      if (tryingToJoinWith.nonEmpty) tryingToJoinWith = None
 
       val comparison = remoteGossip.version tryCompareTo localGossip.version
       val conflict = comparison.isEmpty
