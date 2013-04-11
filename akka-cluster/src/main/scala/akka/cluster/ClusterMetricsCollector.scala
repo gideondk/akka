@@ -103,14 +103,14 @@ private[cluster] class ClusterMetricsCollector(publisher: ActorRef) extends Acto
   /**
    * Adds a member to the node ring.
    */
-  def addMember(member: Member): Unit = nodes += member.address
+  def addMember(member: Member): Unit = nodes += member.addressFIXME
 
   /**
    * Removes a member from the member node ring.
    */
   def removeMember(member: Member): Unit = {
-    nodes -= member.address
-    latestGossip = latestGossip remove member.address
+    nodes -= member.addressFIXME
+    latestGossip = latestGossip remove member.addressFIXME
     publish()
   }
 
@@ -118,7 +118,7 @@ private[cluster] class ClusterMetricsCollector(publisher: ActorRef) extends Acto
    * Updates the initial node ring for those nodes that are [[akka.cluster.MemberStatus.Up]].
    */
   def receiveState(state: CurrentClusterState): Unit =
-    nodes = state.members collect { case m if m.status == Up ⇒ m.address }
+    nodes = state.members collect { case m if m.status == Up ⇒ m.addressFIXME }
 
   /**
    * Samples the latest metrics for the node, updates metrics statistics in

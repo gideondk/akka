@@ -107,10 +107,10 @@ private[akka] class ClusterJmx(cluster: Cluster, log: LoggingAdapter) {
       }
 
       def getMembers: String =
-        clusterView.members.toSeq.map(_.address).mkString(",")
+        clusterView.members.toSeq.map(_.addressFIXME).mkString(",")
 
       def getUnreachable: String =
-        clusterView.unreachableMembers.map(_.address).mkString(",")
+        clusterView.unreachableMembers.map(_.addressFIXME).mkString(",")
 
       def getMemberStatus: String = clusterView.status.toString
 

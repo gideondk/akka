@@ -14,6 +14,7 @@ import scala.util.control.NonFatal
 import akka.actor.SystemGuardian.{ TerminationHookDone, TerminationHook, RegisterTerminationHook }
 import scala.util.control.Exception.Catcher
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.forkjoin.ThreadLocalRandom
 
 /**
  * INTERNAL API
@@ -115,6 +116,8 @@ private[akka] class RemoteActorRefProvider(
 
   private val local = new LocalActorRefProvider(systemName, settings, eventStream, dynamicAccess, deployer,
     Some(deadLettersPath ⇒ new RemoteDeadLetterActorRef(this, deadLettersPath, eventStream)))
+
+  val addressUid: Int = ThreadLocalRandom.current.nextInt()
 
   @volatile
   private var _log = local.log
