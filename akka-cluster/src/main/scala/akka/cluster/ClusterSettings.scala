@@ -44,6 +44,7 @@ class ClusterSettings(val config: Config, val systemName: String) {
   final val SeedNodes: immutable.IndexedSeq[Address] =
     immutableSeq(cc.getStringList("seed-nodes")).map { case AddressFromURIString(addr) ⇒ addr }.toVector
   final val SeedNodeTimeout: FiniteDuration = Duration(cc.getMilliseconds("seed-node-timeout"), MILLISECONDS)
+  final val RetryUnsuccessfulJoinAfter: FiniteDuration = Duration(cc.getMilliseconds("retry-unsuccessful-join-after"), MILLISECONDS)
   final val PeriodicTasksInitialDelay: FiniteDuration = Duration(cc.getMilliseconds("periodic-tasks-initial-delay"), MILLISECONDS)
   final val GossipInterval: FiniteDuration = Duration(cc.getMilliseconds("gossip-interval"), MILLISECONDS)
   final val LeaderActionsInterval: FiniteDuration = Duration(cc.getMilliseconds("leader-actions-interval"), MILLISECONDS)

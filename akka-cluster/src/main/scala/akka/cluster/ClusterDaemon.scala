@@ -293,15 +293,24 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     case _: Tick                  ⇒ // ignore periodic tasks until initialized
   }
 
-  def tryingToJoin(joinWith: Address): Actor.Receive = {
+  def tryingToJoin(joinWith: Address, deadline: Option[Deadline]): Actor.Receive = {
     case Welcome(from, gossip) if from == joinWith ⇒ welcome(from, gossip)
     case Welcome(from, _) ⇒
       log.info("Ignoring welcome from [{}] when trying to join with [{}]", from, joinWith)
-    case InitJoin                 ⇒ sender ! InitJoinNack(selfAddress)
-    case JoinTo(address)          ⇒ join(address)
-    case JoinSeedNodes(seedNodes) ⇒ joinSeedNodes(seedNodes)
+    case InitJoin ⇒ sender ! InitJoinNack(selfAddress)
+    case JoinTo(address) ⇒
+      context.become(uninitialized)
+      join(address)
+    case JoinSeedNodes(seedNodes) ⇒
+      context.become(uninitialized)
+      joinSeedNodes(seedNodes)
     case msg: SubscriptionMessage ⇒ publisher forward msg
-    case _: Tick                  ⇒ // ignore periodic tasks until initialized
+    case _: Tick ⇒
+      if (deadline.exists(_.isOverdue)) {
+        context.become(uninitialized)
+        if (AutoJoin) joinSeedNodes(SeedNodes)
+        else join(joinWith)
+      }
   }
 
   def initialized: Actor.Receive = {
@@ -311,7 +320,6 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     case LeaderActionsTick                      ⇒ leaderActions()
     case PublishStatsTick                       ⇒ publishInternalStats()
     case InitJoin                               ⇒ initJoin()
-    case JoinTo(address)                        ⇒ join(address)
     case ClusterUserAction.Join(address, roles) ⇒ joining(address, roles)
     case ClusterUserAction.Down(address)        ⇒ downing(address)
     case ClusterUserAction.Leave(address)       ⇒ leaving(address)
@@ -319,6 +327,8 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     case Remove(address)                        ⇒ removing(address)
     case SendGossipTo(address)                  ⇒ gossipTo(address)
     case msg: SubscriptionMessage               ⇒ publisher forward msg
+    case JoinTo(address) ⇒
+      log.info("Trying to join [{}] when already part of a cluster, ignoring", address)
 
   }
 
@@ -357,9 +367,9 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     else if (address.system != selfAddress.system)
       log.warning("Trying to join member with wrong ActorSystem name, but was ignored, expected [{}] but was [{}]",
         selfAddress.system, address.system)
-    else if (latestGossip.members.nonEmpty || latestGossip.overview.unreachable.nonEmpty)
-      log.info("Trying to join [{}] when already part of a cluster, ignoring", address)
     else {
+      require(latestGossip.members.isEmpty, "Join can only be done from empty state")
+
       // to support manual join when joining to seed nodes is stuck (no seed nodes available)
       val snd = sender
       seedNodeProcess match {
@@ -377,7 +387,10 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
         context.become(initialized)
         joining(address, cluster.selfRoles)
       } else {
-        context.become(tryingToJoin(address))
+        val joinDeadline =
+          if (RetryUnsuccessfulJoinAfter > Duration.Zero) Some(Deadline.now + RetryUnsuccessfulJoinAfter)
+          else None
+        context.become(tryingToJoin(address, joinDeadline))
         clusterCore(address) ! ClusterUserAction.Join(selfAddress, cluster.selfRoles)
       }
     }
