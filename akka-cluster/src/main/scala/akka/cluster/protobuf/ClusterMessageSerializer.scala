@@ -167,8 +167,8 @@ class ClusterMessageSerializer(val system: ExtendedActorSystem) extends Serializ
   }
 
   private def gossipEnvelopeToProto(envelope: GossipEnvelope): msg.GossipEnvelope = {
-    msg.GossipEnvelope(uniqueAddressToProto(envelope.from), gossipToProto(envelope.gossip),
-      envelope.conversation)
+    msg.GossipEnvelope(uniqueAddressToProto(envelope.from), uniqueAddressToProto(envelope.to),
+      gossipToProto(envelope.gossip), envelope.conversation)
   }
 
   private def gossipEnvelopeFromBinary(bytes: Array[Byte]): GossipEnvelope = {
@@ -205,7 +205,8 @@ class ClusterMessageSerializer(val system: ExtendedActorSystem) extends Serializ
   }
 
   private def gossipEnvelopeFromProto(envelope: msg.GossipEnvelope): GossipEnvelope = {
-    GossipEnvelope(uniqueAddressFromProto(envelope.from), gossipFromProto(envelope.gossip))
+    GossipEnvelope(uniqueAddressFromProto(envelope.from), uniqueAddressFromProto(envelope.to),
+      gossipFromProto(envelope.gossip))
   }
 
   private def metricsGossipEnvelopeToProto(envelope: MetricsGossipEnvelope): msg.MetricsGossipEnvelope = {

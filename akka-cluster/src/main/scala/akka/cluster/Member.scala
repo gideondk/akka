@@ -31,7 +31,7 @@ class Member private[cluster] (
     case m: Member ⇒ uniqueAddress == m.uniqueAddress
     case _         ⇒ false
   }
-  override def toString = "Member(address = %s, status = %s)" format (address, status)
+  override def toString = s"{Member(address = ${address}, status = ${status})"
 
   def hasRole(role: String): Boolean = roles.contains(role)
 

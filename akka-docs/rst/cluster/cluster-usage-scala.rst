@@ -119,6 +119,11 @@ seed nodes at all.
 
 Joining can also be performed programatically with ``Cluster(system).join(address)``.
 
+Unsuccessful join attempts are automatically retried after the time period defined in 
+configuration property ``retry-unsuccessful-join-after``. When using auto-joining with
+``seed-nodes`` this means that a new seed node is picked. When joining manually or
+programatically this means that the last join request is retried. Retries can be disabled by
+setting the property to ``0s``.
 
 Automatic vs. Manual Downing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

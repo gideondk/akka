@@ -72,8 +72,7 @@ class Cluster(val system: ExtendedActorSystem) extends Extension {
   private[cluster] val selfUniqueAddress: UniqueAddress = system.provider match {
     case c: ClusterActorRefProvider ⇒ UniqueAddress(c.transport.defaultAddress, c.addressUid)
     case other ⇒ throw new ConfigurationException(
-      "ActorSystem [%s] needs to have a 'ClusterActorRefProvider' enabled in the configuration, currently uses [%s]".
-        format(system, other.getClass.getName))
+      s"ActorSystem [${system}] needs to have a 'ClusterActorRefProvider' enabled in the configuration, currently uses [${other.getClass.getName}]")
   }
 
   /**

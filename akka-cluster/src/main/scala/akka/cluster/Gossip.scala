@@ -4,7 +4,6 @@
 
 package akka.cluster
 
-import akka.actor.Address
 import scala.collection.immutable
 import MemberStatus._
 
@@ -233,7 +232,11 @@ private[cluster] case class GossipOverview(
 
 /**
  * INTERNAL API
- * Envelope adding a sender address to the gossip.
+ * Envelope adding a sender and receiver address to the gossip.
+ * The reason for including the receiver address is to be able to
+ * ignore messages that were intended for a previous incarnation of
+ * the node with same host:port. The `uid` in the `UniqueAddress` is
+ * different in that case.
  */
 @SerialVersionUID(1L)
-private[cluster] case class GossipEnvelope(from: UniqueAddress, gossip: Gossip, conversation: Boolean = true) extends ClusterMessage
+private[cluster] case class GossipEnvelope(from: UniqueAddress, to: UniqueAddress, gossip: Gossip, conversation: Boolean = true) extends ClusterMessage
