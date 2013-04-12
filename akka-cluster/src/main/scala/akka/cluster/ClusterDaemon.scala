@@ -239,8 +239,8 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
   import cluster.{ selfAddress, selfUniqueAddress, scheduler, failureDetector }
   import cluster.settings._
 
-  // FIXME the UUID should not be needed when Address contains uid, ticket #2788
-  val vclockNode = VectorClock.Node(selfAddress.toString + "-" + UUID.randomUUID())
+  def vclockName(node: UniqueAddress): String = node.address + "-" + node.uid
+  val vclockNode = VectorClock.Node(vclockName(selfUniqueAddress))
 
   // note that self is not initially member,
   // and the Gossip is not versioned for this 'Node' yet
