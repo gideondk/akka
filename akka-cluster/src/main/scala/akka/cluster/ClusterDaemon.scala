@@ -444,7 +444,7 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
 
         latestGossip = seenVersionedGossip
 
-        log.info("Cluster Node [{}] - Node [{}] is JOINING, roles [{}]", selfAddress, node, roles.mkString(", "))
+        log.info("Cluster Node [{}] - Node [{}] is JOINING, roles [{}]", selfAddress, node.address, roles.mkString(", "))
         if (node != selfUniqueAddress) {
           clusterCore(node.address) ! Welcome(selfUniqueAddress, latestGossip)
         }
@@ -579,7 +579,7 @@ private[cluster] final class ClusterCoreDaemon(publisher: ActorRef) extends Acto
     else if (localGossip.members.forall(_.uniqueAddress != from))
       log.info("Ignoring received gossip from unknown [{}]", from)
     else if (remoteGossip.members.forall(_.uniqueAddress != selfUniqueAddress))
-      log.info("Ignoring received that does not contain myself, from [{}]", from)
+      log.info("Ignoring received gossip that does not contain myself, from [{}]", from)
     else {
 
       val comparison = remoteGossip.version tryCompareTo localGossip.version
