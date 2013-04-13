@@ -423,16 +423,17 @@ private[akka] class ActorCell(
         message match {
           case message: SystemMessage if shouldStash(message, currentState) ⇒ stash(message)
           case f: Failed ⇒ handleFailure(f)
-          case DeathWatchNotification(a, ec, at) ⇒ watchedActorTerminated(a, ec, at)
-          case Create() ⇒ create()
-          case Watch(watchee, watcher) ⇒ addWatcher(watchee, watcher)
+          case DeathWatchNotification(a, ec, at) ⇒
+            watchedActorTerminated(a, ec, at)
+          case Create()                  ⇒ create()
+          case Watch(watchee, watcher)   ⇒ addWatcher(watchee, watcher)
           case Unwatch(watchee, watcher) ⇒ remWatcher(watchee, watcher)
-          case Recreate(cause) ⇒ faultRecreate(cause)
-          case Suspend() ⇒ faultSuspend()
-          case Resume(inRespToFailure) ⇒ faultResume(inRespToFailure)
-          case Terminate() ⇒ terminate()
-          case Supervise(child, async) ⇒ supervise(child, async)
-          case NoMessage ⇒ // only here to suppress warning
+          case Recreate(cause)           ⇒ faultRecreate(cause)
+          case Suspend()                 ⇒ faultSuspend()
+          case Resume(inRespToFailure)   ⇒ faultResume(inRespToFailure)
+          case Terminate()               ⇒ terminate()
+          case Supervise(child, async)   ⇒ supervise(child, async)
+          case NoMessage                 ⇒ // only here to suppress warning
         }
       } catch handleNonFatalOrInterruptedException { e ⇒
         handleInvokeFailure(Nil, e)
@@ -470,6 +471,7 @@ private[akka] class ActorCell(
         publish(Debug(self.path.toString, clazz(actor), "received AutoReceiveMessage " + msg))
 
       msg.message match {
+        case t: Terminated              ⇒ receivedTerminated(t)
         case AddressTerminated(address) ⇒ addressTerminated(address)
         case Kill                       ⇒ throw new ActorKilledException("Kill")
         case PoisonPill                 ⇒ self.stop()
