@@ -338,7 +338,10 @@ object Actor {
   /**
    * Type alias representing a Receive-expression for Akka Actors.
    */
+  //#receive
   type Receive = PartialFunction[Any, Unit]
+
+  //#receive
 
   /**
    * emptyBehavior is a Receive-expression that matches no messages at all, ever.
@@ -369,7 +372,7 @@ object Actor {
  * `context`. The only abstract method is `receive` which shall return the
  * initial behavior of the actor as a partial function (behavior can be changed
  * using `context.become` and `context.unbecome`).
- * 
+ *
  * This is the Scala API (hence the Scala code below), for the Java API see [[akka.actor.UntypedActor]].
  *
  * {{{
@@ -463,7 +466,9 @@ trait Actor {
    * This defines the initial actor behavior, it must return a partial function
    * with the actor logic.
    */
-  def receive: Receive
+  //#receive
+  def receive: Actor.Receive
+  //#receive
 
   /**
    * User overridable definition the strategy to use for supervising
@@ -478,8 +483,12 @@ trait Actor {
    * Actors are automatically started asynchronously when created.
    * Empty default implementation.
    */
-  @throws(classOf[Exception])
-  def preStart() {}
+  @throws(classOf[Exception]) // when changing this you MUST also change UntypedActorDocTestBase
+  //#lifecycle-hooks
+  def preStart() {
+  }
+
+  //#lifecycle-hooks
 
   /**
    * User overridable callback.
@@ -487,8 +496,12 @@ trait Actor {
    * Is called asynchronously after 'actor.stop()' is invoked.
    * Empty default implementation.
    */
-  @throws(classOf[Exception])
-  def postStop() {}
+  @throws(classOf[Exception]) // when changing this you MUST also change UntypedActorDocTestBase
+  //#lifecycle-hooks
+  def postStop() {
+  }
+
+  //#lifecycle-hooks
 
   /**
    * User overridable callback: '''By default it disposes of all children and then calls `postStop()`.'''
@@ -498,7 +511,8 @@ trait Actor {
    * Is called on a crashed Actor right BEFORE it is restarted to allow clean
    * up of resources before Actor is terminated.
    */
-  @throws(classOf[Exception])
+  @throws(classOf[Exception]) // when changing this you MUST also change UntypedActorDocTestBase
+  //#lifecycle-hooks
   def preRestart(reason: Throwable, message: Option[Any]) {
     context.children foreach { child ⇒
       context.unwatch(child)
@@ -507,14 +521,20 @@ trait Actor {
     postStop()
   }
 
+  //#lifecycle-hooks
+
   /**
    * User overridable callback: By default it calls `preStart()`.
    * @param reason the Throwable that caused the restart to happen
    * <p/>
    * Is called right AFTER restart on the newly created Actor to allow reinitialization after an Actor crash.
    */
-  @throws(classOf[Exception])
-  def postRestart(reason: Throwable) { preStart() }
+  @throws(classOf[Exception]) // when changing this you MUST also change UntypedActorDocTestBase
+  //#lifecycle-hooks
+  def postRestart(reason: Throwable) {
+    preStart()
+  }
+  //#lifecycle-hooks
 
   /**
    * User overridable callback.

@@ -131,6 +131,8 @@ class PipelineSpec extends AkkaSpec {
 
 object PipelineBench extends App {
 
+  akka.actor.ActorSystem()
+
   val frame = new LengthFieldFrame(32000)
   val frames = frame >> frame >> frame >> frame
 
