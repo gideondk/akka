@@ -34,6 +34,7 @@ import akka.cluster.routing.HeapMetricsSelector
 import akka.cluster.routing.SystemLoadAverageMetricsSelector
 import akka.cluster.routing.CpuMetricsSelector
 import akka.cluster.routing.MetricsSelector
+import akka.dispatch.sysmsg.SystemMessage
 
 /**
  * INTERNAL API
@@ -74,6 +75,12 @@ private[akka] class ClusterActorRefProvider(
     super.useActorOnNode(ref, props, deploy, supervisor)
     import RemoteDeploymentWatcher.WatchRemote
     remoteDeploymentWatcher ! WatchRemote(ref, supervisor)
+  }
+
+  override private[akka] def afterSendSystemMessage(message: SystemMessage): Unit = {
+    // FIXME we need to support remote death watch for a mix of cluster nodes and non-cluster nodes
+    // I'm thinking about creating a subclass of RemoteWatcher that is aware of cluster members
+    // super.afterSendSystemMessage(message)
   }
 
 }
